@@ -1,0 +1,372 @@
+{
+  "description": "Maps apps to the identifiers they leave data under, for finding leftovers after uninstalling. 'ids' are bundle identifiers; 'names' are folder/file name stems (matched as whole words, e.g. 'cursor' matches '.cursor', 'cursor-updater', 'Install Cursor.app', never 'tkMacOSXCursors.h'); 'paths' are extra exact locations. 'keep' lists paths that must never be treated as this app's leftovers (e.g. a command-line tool from the same vendor).",
+  "apps": [
+    {
+      "app": "Cursor",
+      "ids": [
+        "com.todesktop.230313mzl4w4u92"
+      ],
+      "names": [
+        "cursor"
+      ]
+    },
+    {
+      "app": "Visual Studio Code",
+      "ids": [
+        "com.microsoft.VSCode"
+      ],
+      "names": [],
+      "paths": [
+        "~/Library/Application Support/Code",
+        "~/.vscode"
+      ]
+    },
+    {
+      "app": "Windsurf",
+      "ids": [
+        "com.exafunction.windsurf"
+      ],
+      "names": [
+        "windsurf"
+      ],
+      "paths": [
+        "~/.codeium/windsurf"
+      ]
+    },
+    {
+      "app": "Zed",
+      "ids": [
+        "dev.zed.Zed"
+      ],
+      "names": [
+        "zed"
+      ]
+    },
+    {
+      "app": "Claude",
+      "ids": [
+        "com.anthropic.claudefordesktop"
+      ],
+      "names": [],
+      "paths": [
+        "~/Library/Application Support/Claude",
+        "~/Library/Logs/Claude"
+      ],
+      "keep": [
+        "~/.claude",
+        "~/.claude.json",
+        "~/.local/bin/claude",
+        "~/.local/share/claude",
+        "~/.local/state/claude",
+        "~/.cache/claude"
+      ]
+    },
+    {
+      "app": "ChatGPT",
+      "ids": [
+        "com.openai.chat"
+      ],
+      "names": [],
+      "keep": [
+        "~/.codex"
+      ]
+    },
+    {
+      "app": "ChatGPT Atlas",
+      "ids": [
+        "com.openai.atlas"
+      ],
+      "names": []
+    },
+    {
+      "app": "Codex",
+      "ids": [
+        "com.openai.codex"
+      ],
+      "names": [],
+      "keep": [
+        "~/.codex"
+      ]
+    },
+    {
+      "app": "Slack",
+      "ids": [
+        "com.tinyspeck.slackmacgap"
+      ],
+      "names": [
+        "slack"
+      ]
+    },
+    {
+      "app": "Discord",
+      "ids": [
+        "com.hnc.Discord"
+      ],
+      "names": [
+        "discord"
+      ]
+    },
+    {
+      "app": "Microsoft Teams",
+      "ids": [
+        "com.microsoft.teams2",
+        "com.microsoft.teams"
+      ],
+      "names": []
+    },
+    {
+      "app": "zoom.us",
+      "ids": [
+        "us.zoom.xos"
+      ],
+      "names": [
+        "zoom.us"
+      ]
+    },
+    {
+      "app": "Webex",
+      "ids": [
+        "Cisco-Systems.Spark",
+        "com.webex.meetingmanager"
+      ],
+      "names": [
+        "webex"
+      ]
+    },
+    {
+      "app": "Spotify",
+      "ids": [
+        "com.spotify.client"
+      ],
+      "names": [
+        "spotify"
+      ]
+    },
+    {
+      "app": "Notion",
+      "ids": [
+        "notion.id"
+      ],
+      "names": [
+        "notion"
+      ]
+    },
+    {
+      "app": "Figma",
+      "ids": [
+        "com.figma.Desktop"
+      ],
+      "names": [
+        "figma"
+      ]
+    },
+    {
+      "app": "Obsidian",
+      "ids": [
+        "md.obsidian"
+      ],
+      "names": [
+        "obsidian"
+      ]
+    },
+    {
+      "app": "Postman",
+      "ids": [
+        "com.postmanlabs.mac"
+      ],
+      "names": [
+        "postman"
+      ]
+    },
+    {
+      "app": "Docker",
+      "ids": [
+        "com.docker.docker",
+        "com.electron.dockerdesktop"
+      ],
+      "names": [],
+      "paths": [
+        "~/.docker"
+      ]
+    },
+    {
+      "app": "Google Chrome",
+      "ids": [
+        "com.google.Chrome"
+      ],
+      "names": [],
+      "paths": [
+        "~/Library/Application Support/Google/Chrome",
+        "~/Library/Caches/Google/Chrome"
+      ]
+    },
+    {
+      "app": "Microsoft Edge",
+      "ids": [
+        "com.microsoft.edgemac"
+      ],
+      "names": [
+        "microsoft edge"
+      ]
+    },
+    {
+      "app": "Brave Browser",
+      "ids": [
+        "com.brave.Browser"
+      ],
+      "names": [],
+      "paths": [
+        "~/Library/Application Support/BraveSoftware"
+      ]
+    },
+    {
+      "app": "Arc",
+      "ids": [
+        "company.thebrowser.Browser"
+      ],
+      "names": []
+    },
+    {
+      "app": "Firefox",
+      "ids": [
+        "org.mozilla.firefox"
+      ],
+      "names": [
+        "firefox"
+      ]
+    },
+    {
+      "app": "WhatsApp",
+      "ids": [
+        "net.whatsapp.WhatsApp",
+        "desktop.WhatsApp"
+      ],
+      "names": [
+        "whatsapp"
+      ]
+    },
+    {
+      "app": "Telegram",
+      "ids": [
+        "ru.keepcoder.Telegram",
+        "org.telegram.desktop"
+      ],
+      "names": []
+    },
+    {
+      "app": "Granola",
+      "ids": [
+        "com.granola.app"
+      ],
+      "names": [
+        "granola"
+      ]
+    },
+    {
+      "app": "Wispr Flow",
+      "ids": [
+        "com.electron.wispr-flow"
+      ],
+      "names": [
+        "wispr flow"
+      ]
+    },
+    {
+      "app": "Fotor",
+      "ids": [
+        "com.everimaging.fotormac"
+      ],
+      "names": [
+        "fotor"
+      ]
+    },
+    {
+      "app": "VLC",
+      "ids": [
+        "org.videolan.vlc"
+      ],
+      "names": []
+    },
+    {
+      "app": "Adobe Creative Cloud",
+      "ids": [
+        "com.adobe.acc.AdobeCreativeCloud"
+      ],
+      "names": [],
+      "paths": [
+        "~/Library/Application Support/Adobe/CreativeCloud"
+      ]
+    },
+    {
+      "app": "Dropbox",
+      "ids": [
+        "com.getdropbox.dropbox"
+      ],
+      "names": [],
+      "paths": [
+        "~/.dropbox"
+      ]
+    },
+    {
+      "app": "Raycast",
+      "ids": [
+        "com.raycast.macos"
+      ],
+      "names": [
+        "raycast"
+      ]
+    },
+    {
+      "app": "Warp",
+      "ids": [
+        "dev.warp.Warp-Stable"
+      ],
+      "names": [],
+      "paths": [
+        "~/.warp"
+      ]
+    },
+    {
+      "app": "iTerm",
+      "ids": [
+        "com.googlecode.iterm2"
+      ],
+      "names": [
+        "iterm2"
+      ]
+    },
+    {
+      "app": "Android Studio",
+      "ids": [
+        "com.google.android.studio"
+      ],
+      "names": [],
+      "paths": [
+        "~/Library/Application Support/Google/AndroidStudio*",
+        "~/.android"
+      ]
+    },
+    {
+      "app": "LM Studio",
+      "ids": [
+        "ai.elementlabs.lmstudio"
+      ],
+      "names": [
+        "lm studio"
+      ],
+      "paths": [
+        "~/.lmstudio",
+        "~/.cache/lm-studio"
+      ]
+    },
+    {
+      "app": "Ollama",
+      "ids": [
+        "com.electron.ollama"
+      ],
+      "names": [
+        "ollama"
+      ]
+    }
+  ]
+}

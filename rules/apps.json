@@ -1,0 +1,145 @@
+{
+  "pack": "apps",
+  "description": "Caches and leftovers from everyday apps: browsers, chat, media, creative tools, updaters.",
+  "rules": [
+    {
+      "id": "chrome-cache",
+      "name": "Google Chrome browser cache",
+      "category": "apps",
+      "tier": "safe",
+      "paths": ["~/Library/Caches/Google/Chrome"],
+      "reason": "Web pages, images and scripts Chrome saved to load sites faster.",
+      "regenerates": "Chrome refills it as you browse.",
+      "app": "Google Chrome",
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "chrome-code-cache",
+      "name": "Google Chrome compiled-code & service-worker caches",
+      "category": "apps",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Application Support/Google/Chrome/*/Service Worker/CacheStorage",
+        "~/Library/Application Support/Google/Chrome/*/Code Cache",
+        "~/Library/Application Support/Google/Chrome/*/GPUCache"
+      ],
+      "reason": "Offline copies of websites and compiled JavaScript. Not your bookmarks, passwords or history.",
+      "regenerates": "Chrome rebuilds them as you visit sites.",
+      "app": "Google Chrome",
+      "group": true,
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "chrome-old-versions",
+      "name": "Old Google Chrome/Updater downloads",
+      "category": "apps",
+      "tier": "safe",
+      "paths": ["~/Library/Application Support/Google/GoogleUpdater/crx_cache", "~/Library/Application Support/Google/Chrome/Default/optimization_guide_model_store"],
+      "reason": "Update packages and on-device model files Chrome downloads in the background.",
+      "regenerates": "Downloaded again if Chrome needs them.",
+      "app": "Google Chrome",
+      "group": true,
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "brave-edge-arc-cache",
+      "name": "Browser cache",
+      "category": "apps",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Caches/BraveSoftware",
+        "~/Library/Caches/Microsoft Edge",
+        "~/Library/Caches/Arc",
+        "~/Library/Caches/Firefox",
+        "~/Library/Caches/company.thebrowser.Browser"
+      ],
+      "reason": "Pages and images the browser saved to load sites faster.",
+      "regenerates": "Refilled as you browse.",
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "electron-updater-leftovers",
+      "name": "App updater leftovers",
+      "category": "apps",
+      "tier": "safe",
+      "paths": ["~/Library/Caches/*.ShipIt", "~/Library/Caches/*-updater", "~/Library/Caches/*.updater"],
+      "reason": "Downloaded app updates that were already installed.",
+      "regenerates": "The app downloads the next update when one is available.",
+      "minBytes": 10000000,
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "electron-app-caches",
+      "name": "Desktop app web cache",
+      "category": "apps",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Application Support/*/Cache",
+        "~/Library/Application Support/*/Code Cache",
+        "~/Library/Application Support/*/GPUCache",
+        "~/Library/Application Support/*/Service Worker/CacheStorage",
+        "~/Library/Application Support/*/CachedData",
+        "~/Library/Application Support/*/Partitions/*/Cache"
+      ],
+      "reason": "Desktop apps built on web tech (Slack, Discord, Teams, VS Code, Notion…) keep a browser-style cache here. No messages, files or settings.",
+      "regenerates": "The app rebuilds it on next launch.",
+      "minBytes": 50000000,
+      "generic": true,
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "spotify-cache",
+      "name": "Spotify offline/stream cache",
+      "category": "apps",
+      "tier": "safe",
+      "paths": ["~/Library/Application Support/Spotify/PersistentCache", "~/Library/Caches/com.spotify.client"],
+      "reason": "Music Spotify cached while streaming (downloaded playlists live elsewhere and are re-synced).",
+      "regenerates": "Spotify refills it as you listen.",
+      "app": "Spotify",
+      "group": true,
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "zoom-recordings-cache",
+      "name": "Zoom data cache",
+      "category": "apps",
+      "tier": "safe",
+      "paths": ["~/Library/Application Support/zoom.us/data/*.cache", "~/Library/Caches/us.zoom.xos"],
+      "reason": "Temporary Zoom data. Your recordings in ~/Documents/Zoom are not included.",
+      "regenerates": "Recreated when Zoom runs.",
+      "app": "zoom.us",
+      "group": true,
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "adobe-media-cache",
+      "name": "Adobe media cache",
+      "category": "apps",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Application Support/Adobe/Common/Media Cache Files",
+        "~/Library/Application Support/Adobe/Common/Media Cache",
+        "~/Library/Application Support/Adobe/Common/Peak Files"
+      ],
+      "reason": "Preview/conform files Premiere, After Effects and Audition generate from your media.",
+      "regenerates": "Regenerated when you open a project (first open is slower).",
+      "group": true,
+      "platforms": ["darwin"]
+    },
+    {
+      "id": "docker-disk-image",
+      "name": "Docker disk image",
+      "category": "apps",
+      "tier": "rebuildable",
+      "paths": [
+        "~/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+        "~/.orbstack/data",
+        "~/.colima"
+      ],
+      "reason": "All Docker images, containers and volumes live in one large disk file.",
+      "advice": "Run `docker system prune -a` (and `docker volume prune` if you're sure) instead of deleting the file, or lower the disk limit in Docker Desktop settings.",
+      "minBytes": 500000000,
+      "platforms": ["darwin"]
+    }
+  ]
+}

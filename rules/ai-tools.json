@@ -1,0 +1,158 @@
+{
+  "pack": "ai-tools",
+  "description": "AI assistants and model tooling: Claude, Codex, ChatGPT, Cursor, local models.",
+  "rules": [
+    {
+      "id": "claude-desktop-vm",
+      "name": "Claude desktop VM images",
+      "category": "ai-tools",
+      "tier": "rebuildable",
+      "paths": [
+        "~/Library/Application Support/Claude/vm_bundles"
+      ],
+      "reason": "Virtual-machine images Claude desktop uses to run tools in a sandbox.",
+      "regenerates": "Claude downloads them again the next time it needs the sandbox.",
+      "app": "Claude",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "id": "claude-code-old-sessions",
+      "name": "Old Claude Code session transcripts",
+      "category": "ai-tools",
+      "tier": "review",
+      "paths": [
+        "~/.claude/projects/*"
+      ],
+      "reason": "Conversation logs for projects you haven't used in Claude Code for a while. Needed only to --resume those old sessions.",
+      "olderThanDays": 45,
+      "minBytes": 5000000,
+      "group": true
+    },
+    {
+      "id": "codex-old-sessions",
+      "name": "Old Codex session logs",
+      "category": "ai-tools",
+      "tier": "review",
+      "paths": [
+        "~/.codex/sessions/*/*",
+        "~/.codex/archived_sessions"
+      ],
+      "reason": "Recorded Codex sessions from more than a month ago. Needed only to resume or review those sessions.",
+      "olderThanDays": 30,
+      "minBytes": 5000000,
+      "group": true
+    },
+    {
+      "id": "codex-temp",
+      "name": "Codex temp & cache",
+      "category": "ai-tools",
+      "tier": "safe",
+      "paths": [
+        "~/.codex/.tmp",
+        "~/.codex/cache",
+        "~/Library/Caches/com.openai.codex",
+        "~/Library/Caches/Codex"
+      ],
+      "reason": "Temporary files and caches Codex recreates on demand.",
+      "regenerates": "Codex recreates them as needed.",
+      "app": "Codex",
+      "minBytes": 10000000
+    },
+    {
+      "id": "codex-worktrees",
+      "name": "Old Codex worktrees",
+      "category": "ai-tools",
+      "tier": "review",
+      "paths": [
+        "~/.codex/worktrees/*"
+      ],
+      "reason": "Git worktrees Codex created for tasks. Unmerged work in them would be lost.",
+      "olderThanDays": 21,
+      "minBytes": 10000000,
+      "group": true
+    },
+    {
+      "id": "codex-task-workspaces",
+      "name": "Old Codex task folder",
+      "category": "ai-tools",
+      "tier": "review",
+      "paths": [
+        "~/Documents/Codex/*"
+      ],
+      "reason": "Workspace Codex created for a task more than a month ago. Check nothing in it is still needed.",
+      "olderThanDays": 30,
+      "minBytes": 100000000
+    },
+    {
+      "id": "chatgpt-cache",
+      "name": "ChatGPT app cache",
+      "category": "ai-tools",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Caches/com.openai.chat",
+        "~/Library/Caches/com.openai.atlas"
+      ],
+      "reason": "Cache files for the ChatGPT desktop apps. Your chats live on OpenAI's servers.",
+      "regenerates": "Rebuilt as you use the app.",
+      "minBytes": 10000000,
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "id": "cursor-cache",
+      "name": "Cursor editor caches",
+      "category": "ai-tools",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Application Support/Cursor/CachedData",
+        "~/Library/Application Support/Cursor/CachedExtensionVSIXs"
+      ],
+      "reason": "Editor caches.",
+      "regenerates": "Rebuilt when you open a project.",
+      "app": "Cursor",
+      "platforms": [
+        "darwin"
+      ],
+      "group": true
+    },
+    {
+      "id": "huggingface-models",
+      "name": "Downloaded Hugging Face models",
+      "category": "ai-tools",
+      "tier": "review",
+      "paths": [
+        "~/.cache/huggingface/hub/*"
+      ],
+      "reason": "Model weights downloaded by transformers/diffusers. Re-downloadable, but large and slow to fetch again.",
+      "minBytes": 200000000
+    },
+    {
+      "id": "ollama-models",
+      "name": "Ollama / LM Studio models",
+      "category": "ai-tools",
+      "tier": "review",
+      "paths": [
+        "~/.ollama/models",
+        "~/.lmstudio/models",
+        "~/.cache/lm-studio/models"
+      ],
+      "reason": "Local language models. Remove ones you no longer run.",
+      "advice": "Use `ollama list` / `ollama rm <model>` (or LM Studio's My Models) so the app's index stays consistent.",
+      "minBytes": 500000000
+    },
+    {
+      "id": "torch-cache",
+      "name": "PyTorch hub cache",
+      "category": "ai-tools",
+      "tier": "rebuildable",
+      "paths": [
+        "~/.cache/torch"
+      ],
+      "reason": "Pretrained weights downloaded by torch.hub / torchvision.",
+      "regenerates": "Downloaded again when code requests them."
+    }
+  ]
+}

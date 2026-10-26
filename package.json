@@ -1,0 +1,62 @@
+{
+  "name": "disksweep-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that analyses your disk like OmniDiskSweeper and cleans it up only with your approval",
+  "type": "module",
+  "bin": {
+    "disksweep-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "rules",
+    "native",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "darwin"
+  ],
+  "scripts": {
+    "build:native": "clang -O2 -Wall -Wextra -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -o native/bin/dsize native/dsize.c",
+    "build": "npm run build:native && tsc",
+    "test": "vitest run",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "disk",
+    "disk-usage",
+    "cleanup",
+    "macos",
+    "omnidisksweeper",
+    "claude",
+    "codex",
+    "apfs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gautamjajoo/disksweep-mcp.git"
+  },
+  "homepage": "https://github.com/gautamjajoo/disksweep-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/gautamjajoo/disksweep-mcp/issues"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.0.0"
+  },
+  "optionalDependencies": {
+    "fsevents": "^2.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

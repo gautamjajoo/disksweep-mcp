@@ -1,0 +1,138 @@
+{
+  "pack": "dev",
+  "description": "Developer tooling caches and build output. Project folders themselves are never suggested, only their regenerable parts.",
+  "rules": [
+    {
+      "id": "xcode-derived-data",
+      "name": "Xcode build data (DerivedData)",
+      "category": "dev",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Developer/Xcode/DerivedData"
+      ],
+      "reason": "Intermediate build products and indexes for Xcode projects.",
+      "regenerates": "Xcode rebuilds it on the next build.",
+      "app": "Xcode",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "id": "xcode-device-support",
+      "name": "Xcode device support files",
+      "category": "dev",
+      "tier": "rebuildable",
+      "paths": [
+        "~/Library/Developer/Xcode/iOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/watchOS DeviceSupport/*"
+      ],
+      "reason": "Debug symbols copied from each iOS version you've connected a device with. Old versions are rarely needed.",
+      "regenerates": "Copied again when you connect a device running that version.",
+      "olderThanDays": 60,
+      "group": true,
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "id": "xcode-archives",
+      "name": "Xcode archives",
+      "category": "dev",
+      "tier": "review",
+      "paths": [
+        "~/Library/Developer/Xcode/Archives/*"
+      ],
+      "reason": "Builds you archived for distribution. Keep ones whose crash logs you may still need to symbolicate.",
+      "olderThanDays": 180,
+      "group": true,
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "id": "ios-simulators",
+      "name": "iOS Simulator devices",
+      "category": "dev",
+      "tier": "rebuildable",
+      "paths": [
+        "~/Library/Developer/CoreSimulator/Devices"
+      ],
+      "reason": "Simulator devices, including ones for runtimes you no longer have.",
+      "advice": "Run `xcrun simctl delete unavailable` to remove dead simulators safely.",
+      "minBytes": 500000000,
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "id": "package-manager-caches",
+      "name": "Package manager download cache",
+      "category": "dev",
+      "tier": "safe",
+      "paths": [
+        "~/.npm/_cacache",
+        "~/Library/Caches/Yarn",
+        "~/Library/Caches/pnpm",
+        "~/.bun/install/cache",
+        "~/Library/Caches/pip",
+        "~/.cache/pip",
+        "~/.cache/uv",
+        "~/Library/Caches/Homebrew",
+        "~/Library/Caches/CocoaPods",
+        "~/Library/Caches/go-build",
+        "~/.cache/go-build",
+        "~/.cache/pre-commit",
+        "~/.cache/puppeteer",
+        "~/Library/Caches/ms-playwright",
+        "~/Library/Caches/ms-playwright-go",
+        "~/.gem/specs"
+      ],
+      "reason": "Copies of packages already downloaded once, kept to speed up future installs.",
+      "regenerates": "Packages are downloaded again on the next install that needs them.",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "package-stores",
+      "name": "Package store / dependency cache",
+      "category": "dev",
+      "tier": "rebuildable",
+      "paths": [
+        "~/Library/pnpm/store",
+        "~/.gradle/caches",
+        "~/.m2/repository",
+        "~/.cargo/registry",
+        "~/go/pkg/mod",
+        "~/miniforge3/pkgs",
+        "~/miniconda3/pkgs",
+        "~/anaconda3/pkgs",
+        "~/.conda/pkgs"
+      ],
+      "reason": "Shared store of downloaded dependencies. Projects re-fetch what they need.",
+      "regenerates": "Re-downloaded on the next build/install (can take a while on slow connections).",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "vscode-cpp-cache",
+      "name": "VS Code extension caches",
+      "category": "dev",
+      "tier": "safe",
+      "paths": [
+        "~/Library/Caches/vscode-cpptools",
+        "~/Library/Application Support/Code/CachedExtensionVSIXs"
+      ],
+      "reason": "IntelliSense databases and downloaded extension installers.",
+      "regenerates": "Rebuilt when you open a project in VS Code.",
+      "app": "Code",
+      "platforms": [
+        "darwin"
+      ],
+      "group": true
+    }
+  ]
+}
