@@ -1,133 +1,277 @@
-# disksweep-mcp
+<div align="center">
 
-**An MCP server that lets Claude, Codex or any MCP client understand your disk and clean it up only with your approval.**
+# DiskSweep MCP
 
-Small-disk laptops fill up silently: browser and app caches, VM images, `node_modules`, AI tool sessions, old downloads, leftovers from apps you uninstalled. GUI tools like OmniDiskSweeper show you *where* space goes, but you still have to figure out *what* each folder is and whether deleting it breaks something.
+**Find what is filling your Mac. Understand it. Review what goes.**
 
-disksweep gives your assistant the tools to do that work with you:
+A local Model Context Protocol (MCP) server for disk analysis and cleanup.
+Connect it to your assistant to inspect disk usage, investigate unfamiliar folders, and prepare a cleanup proposal.
 
-- **See everything, fast.** It sizes every file on the disk the way OmniDiskSweeper does, but counts APFS clones and hard links once, never triggers iCloud downloads, and keeps an index. Later scans replay macOS's change journal (FSEvents) and re-size only what changed: a 66 s full scan becomes a ~13 s refresh.
-- **Know the usual suspects.** Rule packs cover caches, logs, updater leftovers, Xcode, package managers, Docker, Claude, Codex, Cursor and more. They are plain JSON, so contributions are welcome.
-- **Investigate the unknown.** Where it really differs: `analyse` lists *large folders nothing explains*, and `inspect` tells the assistant what's inside: owner app, file types, age of contents, databases, media, git data, download source. The model works out what it is and how safe it is to remove. File contents are never read.
-- **Remember.** What the assistant learned about a folder, what you said to keep, and what was cleaned, including things that **grow back** after cleaning. The next conversation doesn't start from zero.
-- **Never damage your Mac.** See [Safety](#safety).
+[![npm](https://img.shields.io/npm/v/disksweep-mcp?style=flat-square&color=cb3837)](https://www.npmjs.com/package/disksweep-mcp)
+[![Tests](https://img.shields.io/github/actions/workflow/status/gautamjajoo/disksweep-mcp/test.yml?branch=main&style=flat-square&label=tests)](https://github.com/gautamjajoo/disksweep-mcp/actions/workflows/test.yml)
+[![macOS](https://img.shields.io/badge/macOS-11%2B-111827?style=flat-square&logo=apple)](#requirements)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-43853d?style=flat-square&logo=nodedotjs&logoColor=white)](#requirements)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
-## Why MCP and not "just ask the assistant to run `du` and `rm`"?
+[Quick start](#quick-start) · [Usage](#usage) · [Tools](#tools) · [Safety](#safety) · [Contributing](#contributing)
 
-| Ask your assistant to use the shell | disksweep |
-|---|---|
-| The model writes `rm -rf` commands itself; nothing outside the model checks the path | The only destructive action is "move item #3 of a proposal you saw to the Trash", checked by a guard in code that no prompt can override |
-| Every chat starts from scratch; a full `du` takes about a minute and floods the context | A persistent index, incremental rescans and compact summaries |
-| No memory of what you decided or cleaned | Notes, keep/never-suggest decisions, cleanup history, grew-back detection |
-| `du` counts APFS clones twice | Clone-aware native sizing (`dsize`) |
-| Needs a shell, so Claude Desktop and other chat apps can't do it | Works in any MCP client: Claude Code, Codex, Claude Desktop |
+</div>
 
-## Install
+## Why DiskSweep?
 
-Requires macOS 11+ and Node 20+. (Windows and Linux are planned; everything OS-specific sits behind one interface.)
+Disk usage tools show where space goes. DiskSweep gives your assistant the measurements and context to help explain what those folders are, what can be recreated, and what needs your review.
 
-**Claude Code**
+- **Measure actual disk usage.** A native macOS scanner accounts for exact APFS clones and hard links. Later scans use the macOS change journal to refresh changed folders when possible.
+- **Find common cleanup candidates.** Rules cover app caches, logs, package managers, development tools, and AI tools. Other detectors find stale build folders, old downloads, unused apps, and app leftovers.
+- **Investigate the unfamiliar.** Large folders without a matching rule appear separately. Inspect their file types, ages, likely owner app, and signs of databases or media before making a recommendation.
+- **Keep context between chats.** Save findings, remember what to keep, review cleanup history, and see when a folder grows back.
+- **Review a concrete proposal.** Cleanup operates on numbered proposal items. The server checks paths again before moving them to the Trash.
+
+## Quick start
+
+### Requirements
+
+- **macOS 11 or later**, on Apple Silicon or Intel. Windows and Linux are not supported yet.
+- **Node.js 20 or later** to run the server. For building and testing, use Node.js 22.12 or later.
+- An MCP client that can launch a local server over **stdio**, the standard input/output connection used by this package.
+- For a source build, Apple Command Line Tools with `clang`.
+
+### Build from source
+
+**Release status:** the npm `latest` tag currently points to `0.0.0-stage`, a placeholder without a runnable CLI. Use the source build until a runnable release is published.
+
 ```sh
-claude mcp add disksweep -- npx -y disksweep-mcp
+git clone https://github.com/gautamjajoo/disksweep-mcp.git
+cd disksweep-mcp
+npm ci
+npm run build
+node dist/index.js --version
 ```
 
-**Codex** — `~/.codex/config.toml`
+The build compiles TypeScript and a universal native scanner for Apple Silicon and Intel.
+
+### Connect your assistant
+
+Add this server to your client's MCP configuration. Replace the example path with the absolute path to your checkout.
+
+```json
+{
+  "mcpServers": {
+    "disksweep": {
+      "command": "node",
+      "args": ["/absolute/path/to/disksweep-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+```sh
+claude mcp add disksweep -- node /absolute/path/to/disksweep-mcp/dist/index.js
+```
+
+See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for scope and connection settings.
+
+</details>
+
+<details>
+<summary><strong>Codex</strong></summary>
+
+Add this entry to `~/.codex/config.toml`:
+
 ```toml
 [mcp_servers.disksweep]
-command = "npx"
-args = ["-y", "disksweep-mcp"]
+command = "node"
+args = ["/absolute/path/to/disksweep-mcp/dist/index.js"]
 ```
 
-**Claude Desktop** — `claude_desktop_config.json`
+See the [Codex MCP documentation](https://developers.openai.com/codex/mcp/) for connection and tool approval settings.
+
+</details>
+
+<details>
+<summary><strong>Claude Desktop, Cursor, and other local MCP clients</strong></summary>
+
+Use the JSON configuration above in the client's MCP settings. Claude Desktop uses `claude_desktop_config.json`; [Cursor](https://cursor.com/docs/mcp) uses `.cursor/mcp.json` in a project or `~/.cursor/mcp.json` globally. Other clients may use a different configuration structure. The server command is `node`, with the absolute path to `dist/index.js` as its argument.
+
+If a desktop client cannot find Node.js, run `command -v node` in your terminal and use the returned absolute path as `command`.
+
+</details>
+
+<details>
+<summary><strong>npm setup after a runnable release is published</strong></summary>
+
+Once the npm package contains the executable, clients can launch it with:
+
 ```json
-{ "mcpServers": { "disksweep": { "command": "npx", "args": ["-y", "disksweep-mcp"] } } }
+{
+  "mcpServers": {
+    "disksweep": {
+      "command": "npx",
+      "args": ["-y", "disksweep-mcp"]
+    }
+  }
+}
 ```
 
-For complete sizes, give the host app (Terminal, Claude, Codex…) **Full Disk Access** in System Settings → Privacy & Security. Without it, folders macOS protects are reported as "at least X".
+This configuration does not work with the current placeholder release.
 
-## Use
+</details>
 
-Ask for a checkup, or run the bundled prompt (`/mcp__disksweep__disk_checkup` in Claude Code):
+For more complete scan results, give the app running the server **Full Disk Access** in **System Settings → Privacy & Security**. Without it, protected folders can be unreadable and reported sizes are lower bounds. Restart the host app after changing permissions.
 
-> *"Do a disk checkup."*
+## Usage
 
-The assistant scans, analyses, inspects anything large and unexplained, summarises, and shows a numbered proposal. **Nothing moves until you say which numbers.** Approved items go to the Trash, where Finder's Put Back restores them.
+Start with a request like:
 
-### Your own routine
+> Do a disk checkup. Explain the largest cleanup candidates and show me a proposal before moving anything.
 
-disksweep never schedules itself; you decide if and when it runs. Some options:
+Or ask a more focused question:
 
-- Ask your assistant every morning, or use your client's scheduled tasks or automations with the `disk_checkup` prompt.
-- `npx disksweep-mcp report` prints a read-only report (scan + analysis, no deletions) that you can run from cron or launchd and read whenever you like.
+> What is this large folder in Application Support? Inspect it and explain what might be lost if I remove it.
+
+> I uninstalled Cursor. Find its leftover files and explain why each one matches.
+
+> Keep my Downloads/Research folder and do not suggest it again.
+
+The bundled `disk_checkup` MCP prompt guides the assistant through this workflow:
+
+```text
+Scan → Analyse → Inspect → Propose → User selects items → Move to Trash
+```
+
+A proposal includes item numbers, sizes, paths, reasons, and a cleanup tier. You can approve specific numbers and leave the rest. The client must wait for your approval before calling the cleanup tool. See [Safety](#safety) for the boundary between client approval and server checks.
+
+**Moving files to the Trash does not free their space yet.** They remain there until the Trash is emptied. Use Finder to restore items before permanent deletion.
+
+### Read-only report
+
+From your built checkout:
+
+```sh
+node dist/index.js report
+```
+
+This scans, updates the local index, and prints an analysis without deleting user files. You can run it from your own `cron` or `launchd` routine. DiskSweep does not schedule itself.
+
+## What it adds to an AI chat
+
+The assistant supplies the reasoning. DiskSweep supplies local measurements, disk-specific rules, persistent context, and a constrained cleanup interface.
+
+| Task | Plain chat, without local tools | Assistant with DiskSweep |
+| :--- | :--- | :--- |
+| Find what uses space | Explains commands or asks you to share output | Measures your Mac and returns focused summaries |
+| Understand an unfamiliar folder | Reasons from what you describe | Inspects names, sizes, ages, file types, and likely app ownership |
+| Find common cleanup candidates | Suggests general places to look | Applies rule packs and detectors to local evidence |
+| Continue next time | Needs the relevant context again | Loads its saved index, notes, keep decisions, and cleanup history |
+| Act on findings | Gives you instructions | Moves selected proposal items to the Trash after server checks |
+
+**An assistant with shell access can already do much of this.** DiskSweep packages the work into reusable tools, adds APFS-aware sizing and incremental scans, and applies path checks in code. It does not make the model inherently smarter, and it cannot prove that every unfamiliar file is disposable.
 
 ## Tools
 
-| Tool | Does |
-|---|---|
-| `disk_overview` | Free space, urgency, what macOS itself uses (swap, system, preboot), what grew since yesterday |
-| `scan` / `scan_status` | Build or refresh the index (full or incremental, runs in the background) |
-| `browse` | OmniDiskSweeper-style drill-down into any folder |
-| `inspect` | What a folder or file is: owner app, types, ages, signals, notes, grew-back, safe to act on? |
-| `analyse` | Candidates by tier (safe / rebuildable / review), fastest-growing folders, large and unexplained folders |
-| `app_leftovers` | Everything an uninstalled app left behind, even KB-sized files, or every uninstalled app at once |
-| `remember` / `recall` | Save what something is, or "keep" / "never suggest" |
-| `create_proposal` | Freeze a numbered list for approval (detector findings or investigated paths with a reason) |
-| `trash_approved` | Move only the approved numbers to the Trash, re-checking everything first |
-| `list_old_trash` / `empty_old_trash` | List items trashed more than N days ago, then permanently delete exactly that list, once you confirm (token-bound, 15 minutes, single use) |
-| `cleanup_history` | What was cleaned and how much space it freed |
+| Area | Tool | Purpose |
+| :--- | :--- | :--- |
+| Overview | `disk_overview` | Free space, disk pressure, macOS volumes, scan age, and recorded growth |
+| Scanning | `scan`, `scan_status` | Build or refresh the index and check progress |
+| Investigation | `browse`, `inspect` | Drill into folder sizes and inspect metadata, likely ownership, and saved context |
+| Analysis | `analyse` | Find candidates by tier, growing folders, and large unexplained folders |
+| App leftovers | `app_leftovers` | Find data associated with an uninstalled app and explain each match |
+| Memory | `remember`, `recall` | Save findings and keep decisions, list them, or forget an entry |
+| Proposal | `create_proposal` | Freeze a numbered list from detector results or investigated paths |
+| Cleanup | `trash_approved` | Re-check and move selected proposal items to the Trash |
+| Trash | `list_old_trash`, `empty_old_trash` | List old Trash items, then permanently delete the token-bound set |
+| History | `cleanup_history` | Review recorded cleanup actions and item sizes |
 
-**Detectors:** rule packs · stale project build folders (`node_modules`, `.venv`, `target`, `.next`… in projects untouched for 30+ days; only the regenerable folder, never your code) · large files · Downloads/Desktop items not used for 60+ days · apps not opened for 90+ days · leftovers of uninstalled apps · duplicates (clone-aware, so APFS copies that share blocks aren't counted as waste).
+### Cleanup tiers
 
-**Tiers:** *safe* regenerates by itself · *rebuildable* can be recreated with a command or a download · *review* may contain your own stuff.
+| Tier | Meaning | Typical example |
+| :--- | :--- | :--- |
+| `safe` | Expected to regenerate automatically | Recognised app caches or logs |
+| `rebuildable` | Can be recreated with a command or download | Dependencies in a stale project |
+| `review` | May contain personal data or work | Old downloads, large files, or an unfamiliar folder |
 
-## Leftovers of uninstalled apps
+Tiers help prioritise review. They are not guarantees, and every tier uses the proposal workflow. Paths proposed by the assistant without a detector match always use `review`.
 
-Dragging an app to the Trash leaves data scattered around: `~/.cursor`, `~/Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt` (that's Cursor's updater; apps often use opaque bundle ids), updater caches, saved state, cookies, the installer in Downloads. `app_leftovers "Cursor"` finds all of it, however small, and says why each item matched:
+<details>
+<summary><strong>Detectors and app leftover matching</strong></summary>
 
-- It searches only the dozen places where macOS apps keep data, one level deep. It matches bundle IDs and whole-word names, never substrings: `cursor` matches `.cursor`, `cursor-updater` and `Install Cursor.app`, but not `tkMacOSXCursors.h` or a plugin's `.cursor-plugin` folder.
-- `rules/app-identities.json` maps apps to their IDs and is easy to extend. Apps not in that file are identified from their bundle IDs on disk and labelled as less certain.
-- If the app is installed anywhere (according to Spotlight) or a process is running from its bundle, its data is reported as live, not as leftovers.
-- If the app's own data changed in the last 30 days, it's treated as still in use (being updated, moved, or bundled inside another app) and not suggested. A shared folder something else still writes to, like `~/.cursor/skills`, is flagged and left out.
-- Preferences, launch agents and cookies are listed for completeness but never removed.
+- **Rule packs:** JSON rules in [`rules/`](rules) cover apps, system caches, development tools, and AI tools.
+- **Stale projects:** finds regenerable folders such as `node_modules`, `.venv`, `target`, and `.next` in projects inactive for 30 days by default.
+- **Files:** finds large files and Downloads/Desktop items unused for 60 days by default.
+- **Unused apps:** checks apps not opened for 90 days by default.
+- **App leftovers:** searches common app data locations using bundle IDs and whole-word names. [`rules/app-identities.json`](rules/app-identities.json) maps known apps to their IDs. Inferred matches carry lower confidence. Installed apps and recently active data are excluded from leftover suggestions; protected items can be reported without being removable.
+- **Duplicates:** optional content hashing identifies matching files. Native sizing accounts for shared APFS blocks when estimating wasted space. Duplicate detection is excluded from the default analysis; request it through the `detectors` argument to `analyse`.
+
+</details>
 
 ## Safety
 
-The guard (`src/safety/guard.ts`) is **default-deny**, and its rules are code, not configuration:
+DiskSweep separates **the client's approval workflow** from **checks enforced by the server**.
 
-- It acts only inside your home folder, plus third-party `.app` bundles in `/Applications`.
-- **Never touched:** `/System`, `/usr`, `/bin`, `/sbin`, `/private`, `/Library`, `/opt`, `/Volumes` and the rest of the OS. Inside your home: settings and credentials (`~/Library/Preferences`, `Keychains`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config`, shell dotfiles), synced data (iCloud Drive, `CloudStorage`), Mail, Messages, Safari, Apple's own app data (`com.apple.*`), `.git` internals, the insides of Photos and Music libraries, and the top-level folders themselves (`~/Documents`, `~/Library/Caches`…).
-- Before anything moves, it re-checks every path: no symlinked parents, the path wasn't replaced, it isn't SIP-protected, locked or owned by another user, it isn't a mount point, and it isn't an Apple app. Items the user must review are skipped if they changed after you saw them. Apps' data is skipped while the app is running.
-- Paths must match their exact on-disk spelling. APFS ignores letter case, so `~/library` would otherwise slip past a check for `~/Library`. Comparisons also ignore case and Unicode normalisation as a second layer. Trailing slashes, which would make macOS follow a symlink, are refused.
-- It never uses `sudo`. Items always go to the Trash first. The only permanent deletion is emptying old Trash items, and only the exact list you were shown.
-- Red-team tests cover tampered proposal files, `..` and symlink tricks, SIP-protected files and locked files.
+The server instructions tell the assistant to show a proposal and wait for approval of specific item numbers. The server accepts a proposal ID and item numbers, but it cannot independently verify that a human approved them. Keep your MCP client's confirmation controls enabled for destructive tools.
 
-Add your own never-touch paths in `~/.disksweep/config.json`:
+Within DiskSweep, the cleanup path applies these checks:
+
+- **Restricted locations.** Cleanup is limited to allowed paths inside your home folder and third-party app bundles directly in `/Applications`. The guard blocks operating-system paths, credential stores, synced data, Git internals, and other protected locations.
+- **Checks before moving.** Paths must use their exact on-disk spelling. The guard checks parent paths, ownership, protected file flags, mount points, and app restrictions. Proposal items also record file identity; items in the `review` tier are skipped if their contents changed since the proposal.
+- **Trash first.** Normal cleanup moves items to the Trash. Proposals expire after 24 hours. DiskSweep does not use `sudo`.
+- **Separate permanent deletion.** `empty_old_trash` requires a list token and `confirm: true`. Tokens expire after 15 minutes and can be used once. The deletion code limits itself to the recorded set and skips replaced items. Lists longer than 30 items are abbreviated in the current tool output; use Finder if you need to inspect every item before deletion.
+
+These checks govern DiskSweep tools. They do not restrict an assistant's separate shell tools or protect against a process that can change the server or its local state. Review the proposed paths and reasons before cleanup.
+
+<details>
+<summary><strong>Protected paths and implementation</strong></summary>
+
+The guard protects system locations such as `/System`, `/usr`, `/bin`, `/private`, and `/Library`. Home-folder protections include credentials, preferences, Mail, Messages, Safari data, cloud sync folders, Apple app data, and the internals of media libraries. Standard folders such as `~/Documents` and `~/Library/Caches` cannot themselves be removed.
+
+Some rules have narrow exceptions, such as individual Mail Downloads attachments. A whole media library can be proposed for review even though its internals are protected. See [`src/safety/guard.ts`](src/safety/guard.ts) for the exact rules.
+
+Proposal execution is in [`src/proposal.ts`](src/proposal.ts). Permanent Trash deletion has its own checks in [`src/trash.ts`](src/trash.ts).
+
+</details>
+
+## Configuration and privacy
+
+Add optional settings to `~/.disksweep/config.json`:
+
 ```json
-{ "protected": ["~/Documents/Thesis"], "staleProjectDays": 30, "staleDownloadDays": 60, "unusedAppDays": 90 }
+{
+  "protected": ["~/Documents/Thesis"],
+  "staleProjectDays": 30,
+  "staleDownloadDays": 60,
+  "unusedAppDays": 90
+}
 ```
+
+The index, daily snapshots, proposals, notes, and cleanup history live in `~/.disksweep/`. Keep decisions and additional protected paths exclude items from new proposals.
+
+Scanning and folder inspection use metadata. **Optional duplicate detection reads file contents locally to calculate hashes.** App detection also reads app metadata. Tool results can contain file names, paths, sizes, dates, download URLs, and saved notes; your MCP client may send those results to its model provider. DiskSweep itself does not need a model API key.
 
 ## How sizing works
 
-`native/dsize.c` walks directories with `getattrlistbulk`, which returns a whole directory's metadata in a few system calls. It counts allocated bytes and:
-- counts **exact APFS clones once** (by clone id), and fetches a file's private size only for files that share blocks. Partly modified clones are counted in full, like `du`, so sizes are never too low.
-- counts **hard links once**.
-- skips **dataless iCloud files** (they count as 0 and are never downloaded).
-- stays on one volume and never follows symlinks.
+The native [`dsize`](native/dsize.c) helper uses macOS `getattrlistbulk` to read directory metadata in batches. It counts allocated bytes, deduplicates exact APFS clones and hard links within a scan, and skips cloud-only files without downloading them. It stays on one volume and does not follow symlinks.
 
-The engine streams results and keeps only folders at or above 10 MB plus the 200 largest files, so the index stays small. If the helper is missing it falls back to `/usr/bin/du`.
+Partly modified clones are counted in full, so shared blocks can still be overcounted. The index retains folders above a configurable threshold, 10 MB by default, and up to 200 large files. Incremental scans use FSEvents, the macOS file-change journal, with a full-scan fallback when needed. If the native helper is unavailable, sizing falls back to `/usr/bin/du` with reduced capabilities.
 
-Prior art: [OmniDiskSweeper](https://www.omnigroup.com/more) and [OpenSweeper](https://github.com/leavez/OpenSweeper) (GUI apps). disksweep is the agent-native counterpart, and none of their code is used.
+Scan time depends on your disk, file count, permissions, and changed folders. Reported sizes are estimates of disk usage, not a promise of space reclaimed after deletion.
 
-## Develop
+## Contributing
+
+Use the [source setup](#build-from-source), then run:
 
 ```sh
-npm install
-npm run build      # compiles native/dsize (universal arm64 + x86_64) and TypeScript
-npm test           # guard red-team tests, scanner vs du, clones, incremental, end-to-end flow
+npm test
 ```
 
-Data lives in `~/.disksweep/` (index, daily snapshots, proposals, memory, history).
+The test suite covers path guards, proposal execution, app leftovers, locking, clone-aware sizing, and incremental scans. Run `npm run build` after code changes and before testing changes to the native helper.
+
+Contributions to rule packs and app identities are welcome. Include the paths you want to match, what they contain, how the data is recreated, and any cases where removing it could lose user data. Report bugs through [GitHub Issues](https://github.com/gautamjajoo/disksweep-mcp/issues).
+
+Inspired by the disk exploration workflow of [OmniDiskSweeper](https://www.omnigroup.com/more) and [OpenSweeper](https://github.com/leavez/OpenSweeper). DiskSweep does not use their code.
 
 ## License
 
-MIT
+[MIT](LICENSE)
