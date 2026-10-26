@@ -34,32 +34,25 @@ Disk usage tools show where space goes. DiskSweep gives your assistant the measu
 - **macOS 11 or later**, on Apple Silicon or Intel. Windows and Linux are not supported yet.
 - **Node.js 20 or later** to run the server. For building and testing, use Node.js 22.12 or later.
 - An MCP client that can launch a local server over **stdio**, the standard input/output connection used by this package.
-- For a source build, Apple Command Line Tools with `clang`.
 
-### Build from source
-
-**Release status:** the npm `latest` tag currently points to `0.0.0-stage`, a placeholder without a runnable CLI. Use the source build until a runnable release is published.
+### Run with npm
 
 ```sh
-git clone https://github.com/gautamjajoo/disksweep-mcp.git
-cd disksweep-mcp
-npm ci
-npm run build
-node dist/index.js --version
+npx -y disksweep-mcp --version
 ```
 
-The build compiles TypeScript and a universal native scanner for Apple Silicon and Intel.
+No global installation is needed. Your MCP client starts the server through `npx` when it connects.
 
 ### Connect your assistant
 
-Add this server to your client's MCP configuration. Replace the example path with the absolute path to your checkout.
+Add this server to your client's MCP configuration. The client will download and run the npm package.
 
 ```json
 {
   "mcpServers": {
     "disksweep": {
-      "command": "node",
-      "args": ["/absolute/path/to/disksweep-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "disksweep-mcp"]
     }
   }
 }
@@ -69,7 +62,7 @@ Add this server to your client's MCP configuration. Replace the example path wit
 <summary><strong>Claude Code</strong></summary>
 
 ```sh
-claude mcp add disksweep -- node /absolute/path/to/disksweep-mcp/dist/index.js
+claude mcp add disksweep -- npx -y disksweep-mcp
 ```
 
 See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for scope and connection settings.
@@ -83,8 +76,8 @@ Add this entry to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.disksweep]
-command = "node"
-args = ["/absolute/path/to/disksweep-mcp/dist/index.js"]
+command = "npx"
+args = ["-y", "disksweep-mcp"]
 ```
 
 See the [Codex MCP documentation](https://developers.openai.com/codex/mcp/) for connection and tool approval settings.
@@ -94,29 +87,9 @@ See the [Codex MCP documentation](https://developers.openai.com/codex/mcp/) for 
 <details>
 <summary><strong>Claude Desktop, Cursor, and other local MCP clients</strong></summary>
 
-Use the JSON configuration above in the client's MCP settings. Claude Desktop uses `claude_desktop_config.json`; [Cursor](https://cursor.com/docs/mcp) uses `.cursor/mcp.json` in a project or `~/.cursor/mcp.json` globally. Other clients may use a different configuration structure. The server command is `node`, with the absolute path to `dist/index.js` as its argument.
+Use the JSON configuration above in the client's MCP settings. Claude Desktop uses `claude_desktop_config.json`; [Cursor](https://cursor.com/docs/mcp) uses `.cursor/mcp.json` in a project or `~/.cursor/mcp.json` globally. Other clients may use a different configuration structure. The server command is `npx`, with `-y` and `disksweep-mcp` as its arguments.
 
-If a desktop client cannot find Node.js, run `command -v node` in your terminal and use the returned absolute path as `command`.
-
-</details>
-
-<details>
-<summary><strong>npm setup after a runnable release is published</strong></summary>
-
-Once the npm package contains the executable, clients can launch it with:
-
-```json
-{
-  "mcpServers": {
-    "disksweep": {
-      "command": "npx",
-      "args": ["-y", "disksweep-mcp"]
-    }
-  }
-}
-```
-
-This configuration does not work with the current placeholder release.
+If a desktop client cannot find `npx`, run `command -v npx` in your terminal and use the returned absolute path as `command`.
 
 </details>
 
@@ -148,10 +121,8 @@ A proposal includes item numbers, sizes, paths, reasons, and a cleanup tier. You
 
 ### Read-only report
 
-From your built checkout:
-
 ```sh
-node dist/index.js report
+npx -y disksweep-mcp report
 ```
 
 This scans, updates the local index, and prints an analysis without deleting user files. You can run it from your own `cron` or `launchd` routine. DiskSweep does not schedule itself.
@@ -260,11 +231,19 @@ Scan time depends on your disk, file count, permissions, and changed folders. Re
 
 ## Contributing
 
-Use the [source setup](#build-from-source), then run:
+### Build from source
+
+Use Node.js 22.12 or later and Apple Command Line Tools with `clang`:
 
 ```sh
+git clone https://github.com/gautamjajoo/disksweep-mcp.git
+cd disksweep-mcp
+npm ci
+npm run build
 npm test
 ```
+
+The build compiles TypeScript and a universal native scanner for Apple Silicon and Intel. To use your local build, set your MCP server command to `node` and its argument to the absolute path of `dist/index.js` in your checkout.
 
 The test suite covers path guards, proposal execution, app leftovers, locking, clone-aware sizing, and incremental scans. Run `npm run build` after code changes and before testing changes to the native helper.
 
