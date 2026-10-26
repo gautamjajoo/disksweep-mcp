@@ -32,6 +32,10 @@ export interface Candidate {
   ruleId?: string;
   /** Process name: skip while this app is running. */
   app?: string;
+  /** For leftovers: the uninstalled app; re-checked when a proposal is made. */
+  leftoverOf?: string;
+  /** When it was found (for candidates kept outside an analysis). */
+  foundAt?: number;
 }
 
 /** Findings we explain but never act on (e.g. Docker disk image, Trash). */

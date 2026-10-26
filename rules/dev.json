@@ -85,7 +85,9 @@
         "~/.cache/puppeteer",
         "~/Library/Caches/ms-playwright",
         "~/Library/Caches/ms-playwright-go",
-        "~/.gem/specs"
+        "~/.gem/specs",
+        "~/Library/Caches/pypoetry/cache",
+        "~/Library/Caches/pypoetry/artifacts"
       ],
       "reason": "Copies of packages already downloaded once, kept to speed up future installs.",
       "regenerates": "Packages are downloaded again on the next install that needs them.",
@@ -102,7 +104,6 @@
       "paths": [
         "~/Library/pnpm/store",
         "~/.gradle/caches",
-        "~/.m2/repository",
         "~/.cargo/registry",
         "~/go/pkg/mod",
         "~/miniforge3/pkgs",
@@ -133,6 +134,21 @@
         "darwin"
       ],
       "group": true
+    },
+    {
+      "id": "maven-local-repo",
+      "name": "Maven local repository",
+      "category": "dev",
+      "tier": "review",
+      "paths": [
+        "~/.m2/repository"
+      ],
+      "reason": "Downloaded Maven dependencies, which are re-fetched on the next build. But artifacts you installed locally with `mvn install` may exist only here.",
+      "minBytes": 200000000,
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
     }
   ]
 }

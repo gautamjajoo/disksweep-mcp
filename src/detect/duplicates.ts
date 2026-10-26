@@ -86,8 +86,8 @@ function groupBy<T>(items: T[], key: (t: T) => string): T[][] {
 async function wastedBytes(paths: string[], fallbackEach: number): Promise<number> {
   const engine = sizingEngine();
   if (engine.name !== "dsize") return fallbackEach * (paths.length - 1);
-  const { stdout } = await run(engine.cmd, ["--", ...paths]);
-  const sizes = stdout.trim().split("\n").map((l) => Number(l.split("\t")[0]));
+  const { stdout } = await run(engine.cmd, ["-0", "--", ...paths]);
+  const sizes = stdout.split("\0").filter(Boolean).map((l) => Number(l.split("\t")[0]));
   return sizes.slice(1).reduce((s, n) => s + n, 0);
 }
 

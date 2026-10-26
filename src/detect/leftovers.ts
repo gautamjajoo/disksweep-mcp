@@ -13,11 +13,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { describeAge, formatBytes } from "../format.js";
-import { dataPath, readJson, tildify, userHome, writeJson } from "../paths.js";
+import { dataPath, isWithinFolded, readJson, tildify, userHome, writeJson } from "../paths.js";
 import { checkPath } from "../safety/guard.js";
 import { duTree } from "../scan/du.js";
 import { TopFiles } from "../scan/tree.js";
-import { installedApps, InstalledApp } from "./apps.js";
+import { installedApps, InstalledApp, ownerOf } from "./apps.js";
 import { expandPattern } from "./rules.js";
 import { Candidate, Tier, candidateId } from "./types.js";
 
@@ -164,7 +164,7 @@ async function searchFor(id: Identity): Promise<LeftoverItem[]> {
     const st = await fs.promises.lstat(p).catch(() => undefined);
     found.set(p, {
       path: p,
-      strong: m.why.includes("bundle id") || m.why.includes("known"),
+      strong: !id.inferred && (m.why.includes("bundle id") || m.why.includes("known")),
       size,
       newest,
       kind: loc?.kind ?? "app data",
@@ -192,7 +192,6 @@ async function searchFor(id: Identity): Promise<LeftoverItem[]> {
     }
   }
   const keep = (id.keep ?? []).map((k) => k.replace(/^~/, home));
-  for (const k of keep) found.delete(k);
   for (const pattern of id.paths ?? []) {
     for (const p of await expandPattern(pattern)) {
       const loc = [...LOCATIONS].reverse().find((l) => p.startsWith(path.join(home, l.rel) + "/"));
@@ -200,7 +199,7 @@ async function searchFor(id: Identity): Promise<LeftoverItem[]> {
     }
   }
   // Drop protected paths and items nested inside another found item.
-  const items = [...found.values()].filter((it) => !keep.some((k) => it.path === k || it.path.startsWith(k + "/")));
+  const items = [...found.values()].filter((it) => !keep.some((k) => isWithinFolded(it.path, k)));
   return items
     .filter((it) => !items.some((o) => o !== it && it.path.startsWith(o.path + "/")))
     .sort((a, b) => b.size - a.size);
@@ -237,6 +236,13 @@ async function installedLocation(id: Identity, apps: InstalledApp[]): Promise<st
   // Running from a bundle that still exists = installed somewhere we didn't look.
   const live = (await processesFrom(id.app)).find((p) => p.bundleExists);
   if (live) return `${live.bundle} (running)`;
+  // Names guessed from folders ("Bitcoin") must not miss a similarly named app ("Bitcoin-Qt").
+  if (id.inferred) {
+    for (const n of [id.app, ...id.names]) {
+      const owner = ownerOf(n, apps);
+      if (owner) return owner.path;
+    }
+  }
   const names = [id.app, ...id.names].map(lower);
   const ids = id.ids.map(lower);
   const local = apps.find((a) => names.includes(lower(a.name)) || (a.bundleId && ids.includes(lower(a.bundleId))));
@@ -264,6 +270,10 @@ async function resolveIdentity(appName: string): Promise<Identity> {
   if (known) return known;
   // Unknown app: look for bundle ids on disk that contain the name as a component prefix.
   const ids = new Set<string>();
+  if (q.replace(/\s+/g, "").length < 4) return { app: appName.trim(), ids: [], names: [q], inferred: true };
+  const installedVendors = new Set(
+    (await installedApps()).map((a) => a.bundleId && lower(a.bundleId).split(".").slice(0, 2).join(".")).filter(Boolean),
+  );
   const home = userHome();
   for (const rel of ["Library/Containers", "Library/Caches", "Library/Preferences", "Library/Application Support", "Library/Saved Application State", "Library/HTTPStorages"]) {
     let names: string[] = [];
@@ -276,6 +286,8 @@ async function resolveIdentity(appName: string): Promise<Identity> {
       const b = baseId(n);
       if (!BUNDLE_ID_RE.test(b) || lower(b).startsWith("com.apple.")) continue;
       const comps = lower(b).split(".").slice(1);
+      // Skip ids from a vendor with an installed app: likely that app's helper.
+      if (installedVendors.has(lower(b).split(".").slice(0, 2).join("."))) continue;
       if (comps.some((c) => c.startsWith(q.replace(/\s+/g, "")))) ids.add(b);
     }
   }
@@ -331,6 +343,8 @@ function toCandidates(app: string, items: LeftoverItem[], explicit = false): Can
       size: it.size,
       reason: `${it.kind} left by ${app}, which is not installed (${it.why}).`,
       lastUsed: it.newest,
+      leftoverOf: app,
+      foundAt: Date.now(),
     }));
 }
 
@@ -417,8 +431,18 @@ export function registerCandidates(list: Candidate[]): void {
   writeJson(file, [...list, ...existing].slice(0, 500));
 }
 
+const CANDIDATE_TTL_MS = 24 * 3600_000;
+
 export function extraCandidates(): Candidate[] {
-  return readJson<Candidate[]>(dataPath("extra-candidates.json"), []);
+  return readJson<Candidate[]>(dataPath("extra-candidates.json"), []).filter(
+    (c) => c.foundAt && Date.now() - c.foundAt < CANDIDATE_TTL_MS,
+  );
+}
+
+/** Is the app installed (or running from an existing bundle) right now? */
+export async function appPresent(appName: string): Promise<boolean> {
+  const id = await resolveIdentity(appName);
+  return !!(await installedLocation(id, await installedApps()));
 }
 
 export function formatLeftovers(r: LeftoverReport, detailed = true): string {

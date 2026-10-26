@@ -6,17 +6,16 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { dataPath, readJson, tildify, writeJson, expandHome, isWithin } from "./paths.js";
+import { dataPath, readJson, tildify, writeJson, expandHome, isWithin, isWithinFolded } from "./paths.js";
 import { checkPath, assertSafe } from "./safety/guard.js";
 import { getPlatform } from "./platform/index.js";
 import { formatBytes } from "./format.js";
 import { loadConfig } from "./config.js";
-import { Sizer } from "./detect/sizes.js";
+import { measurePath } from "./detect/sizes.js";
 import { Tier } from "./detect/types.js";
 import { AnalysedCandidate, lastAnalysis } from "./analyse.js";
-import { extraCandidates } from "./detect/leftovers.js";
+import { appPresent, extraCandidates } from "./detect/leftovers.js";
 import { HistoryEntry, isExcluded, recordHistory } from "./memory.js";
-import { loadIndex } from "./scan/scanner.js";
 
 const TTL_MS = 24 * 3600_000;
 
@@ -25,6 +24,8 @@ export interface FrozenPath {
   size: number;
   ino: number;
   mtimeMs: number;
+  /** Newest modification anywhere inside when the user was shown it. */
+  newest?: number;
 }
 
 export interface ProposalItem {
@@ -54,9 +55,10 @@ export function loadProposal(id: string): Proposal | undefined {
   return readJson<Proposal | undefined>(file(id), undefined);
 }
 
-async function freeze(p: string, sizer: Sizer): Promise<FrozenPath> {
+async function freeze(p: string): Promise<FrozenPath> {
   const st = await fs.promises.lstat(p);
-  return { path: p, size: await sizer.sizeOf(p), ino: st.ino, mtimeMs: st.mtimeMs };
+  const m = await measurePath(p); // fresh, not from the index: this is what the user approves
+  return { path: p, size: m.size, ino: st.ino, mtimeMs: st.mtimeMs, newest: m.newest };
 }
 
 export interface CustomItem {
@@ -71,11 +73,10 @@ export interface CustomItem {
  */
 export async function createProposal(candidateIds: string[], custom: CustomItem[]): Promise<{ proposal: Proposal; rejected: string[] }> {
   const analysis = lastAnalysis();
-  const sizer = new Sizer(loadIndex());
   const rejected: string[] = [];
   const items: ProposalItem[] = [];
   const protectedByUser = loadConfig().protected.map(expandHome);
-  const userBlocked = (p: string) => protectedByUser.some((x) => isWithin(p, x) || isWithin(x, p)) || !!isExcluded(p);
+  const userBlocked = (p: string) => protectedByUser.some((x) => isWithinFolded(p, x) || isWithinFolded(x, p)) || !!isExcluded(p);
 
   for (const id of candidateIds) {
     const c: AnalysedCandidate | undefined =
@@ -84,12 +85,16 @@ export async function createProposal(candidateIds: string[], custom: CustomItem[
       rejected.push(`${id}: unknown candidate id (run analyse or app_leftovers first)`);
       continue;
     }
+    if (c.leftoverOf && (await appPresent(c.leftoverOf))) {
+      rejected.push(`${c.title}: ${c.leftoverOf} is installed again, so this is live data now`);
+      continue;
+    }
     const paths: FrozenPath[] = [];
     for (const p of c.paths) {
       const g = checkPath(p);
       if (!g.ok) rejected.push(`${tildify(p)}: ${g.reason}`);
       else if (userBlocked(p)) rejected.push(`${tildify(p)}: you asked to keep this`);
-      else if (fs.existsSync(p)) paths.push(await freeze(p, sizer));
+      else if (fs.existsSync(p)) paths.push(await freeze(p));
     }
     if (!paths.length) continue;
     items.push({
@@ -121,7 +126,7 @@ export async function createProposal(candidateIds: string[], custom: CustomItem[
       rejected.push(`${ci.path}: does not exist`);
       continue;
     }
-    const fp = await freeze(p, sizer);
+    const fp = await freeze(p);
     items.push({
       n: items.length + 1, title: ci.title ?? path.basename(p), tier: "review", reason: ci.reason, source: "assistant",
       paths: [fp], size: fp.size, status: "pending",
@@ -199,10 +204,14 @@ export async function trashApproved(proposalId: string, itemNumbers: number[]): 
         problems.push(`${tildify(fp.path)}: was replaced by something else since the proposal`);
         continue;
       }
-      // Caches change constantly; user content must not have changed since approval was asked.
-      if (item.tier === "review" && Math.abs(st.mtimeMs - fp.mtimeMs) > 1000) {
-        problems.push(`${tildify(fp.path)}: modified since the proposal was shown`);
-        continue;
+      // Caches change constantly; user content must not have changed since approval was asked
+      // (anywhere inside, not just the folder's own timestamp).
+      if (item.tier === "review") {
+        const now = await measurePath(fp.path);
+        if (Math.abs(st.mtimeMs - fp.mtimeMs) > 1000 || (now.newest ?? 0) > (fp.newest ?? 0) + 1000) {
+          problems.push(`${tildify(fp.path)}: modified since the proposal was shown`);
+          continue;
+        }
       }
       try {
         await platform.moveToTrash([fp.path]);

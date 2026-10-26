@@ -7,75 +7,110 @@
       "name": "Mail attachment copies",
       "category": "system",
       "tier": "safe",
-      "paths": ["~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads"],
+      "paths": [
+        "~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/*"
+      ],
       "reason": "Copies of attachments you opened from Mail. The originals stay in your mailbox.",
       "regenerates": "Mail re-creates them when you open an attachment again.",
       "app": "Mail",
-      "platforms": ["darwin"]
+      "platforms": [
+        "darwin"
+      ],
+      "group": true,
+      "minBytes": 20000000
     },
     {
       "id": "ios-software-updates",
       "name": "Downloaded iPhone/iPad updates",
       "category": "system",
       "tier": "safe",
-      "paths": ["~/Library/iTunes/iPhone Software Updates/*", "~/Library/iTunes/iPad Software Updates/*"],
+      "paths": [
+        "~/Library/iTunes/iPhone Software Updates/*",
+        "~/Library/iTunes/iPad Software Updates/*"
+      ],
       "reason": "iOS/iPadOS firmware files downloaded by Finder/iTunes to update a device.",
       "regenerates": "Downloaded again if you ever update or restore a device from this Mac.",
-      "platforms": ["darwin"]
+      "platforms": [
+        "darwin"
+      ]
     },
     {
       "id": "ios-backups",
       "name": "iPhone/iPad backup",
       "category": "system",
       "tier": "review",
-      "paths": ["~/Library/Application Support/MobileSync/Backup/*"],
+      "paths": [
+        "~/Library/Application Support/MobileSync/Backup/*"
+      ],
       "reason": "A local backup of an iPhone or iPad. Old backups of devices you no longer own are pure waste; your current device's latest backup may be worth keeping.",
       "minBytes": 100000000,
-      "platforms": ["darwin"]
+      "platforms": [
+        "darwin"
+      ]
     },
     {
       "id": "user-logs",
       "name": "App logs",
       "category": "system",
       "tier": "safe",
-      "paths": ["~/Library/Logs/*"],
+      "paths": [
+        "~/Library/Logs/*"
+      ],
       "reason": "Diagnostic logs written by apps. Only useful when debugging a problem.",
       "regenerates": "Apps write new logs as they run.",
       "generic": true,
-      "platforms": ["darwin"]
+      "platforms": [
+        "darwin"
+      ]
     },
     {
       "id": "user-caches",
       "name": "App cache",
       "category": "system",
       "tier": "safe",
-      "paths": ["~/Library/Caches/*"],
+      "paths": [
+        "~/Library/Caches/*"
+      ],
       "reason": "Cache files an app keeps to speed itself up. Contains no documents or settings.",
       "regenerates": "The app rebuilds it as needed (it may feel a little slower the first time).",
       "minBytes": 100000000,
       "generic": true,
-      "platforms": ["darwin"]
+      "platforms": [
+        "darwin"
+      ],
+      "exclude": [
+        "~/Library/Caches/pypoetry",
+        "~/Library/Caches/JetBrains"
+      ]
     },
     {
       "id": "macos-installers",
       "name": "macOS installer app",
       "category": "system",
       "tier": "review",
-      "paths": ["/Applications/Install macOS*.app"],
+      "paths": [
+        "/Applications/Install macOS*.app"
+      ],
       "reason": "A full macOS installer (often 12+ GB) left over after an upgrade.",
       "advice": "Apple-signed, so disksweep won't move it. If you don't need it, drag it to the Trash in Finder.",
-      "platforms": ["darwin"]
+      "platforms": [
+        "darwin"
+      ]
     },
     {
       "id": "trash",
       "name": "Items already in the Trash",
       "category": "system",
       "tier": "safe",
-      "paths": ["~/.Trash"],
+      "paths": [
+        "~/.Trash"
+      ],
       "reason": "Files in the Trash still use disk space until it is emptied.",
       "advice": "Use the empty_old_trash tool (lists first, asks before deleting) or empty the Trash in Finder.",
       "minBytes": 100000000,
-      "platforms": ["darwin"]
+      "platforms": [
+        "darwin"
+      ]
     }
   ]
 }

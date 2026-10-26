@@ -29,6 +29,8 @@ export interface Rule {
   app?: string;
   /** Broad catch-all rule: evaluated last, never overlaps more specific rules. */
   generic?: boolean;
+  /** Paths a pattern may match that this rule must skip. */
+  exclude?: string[];
   /** Never acted on; explained with this advice instead. */
   advice?: string;
   platforms?: string[];
@@ -111,8 +113,11 @@ export async function runRules(rules: Rule[], sizer: Sizer, claimed: string[]): 
         } catch {
           continue;
         }
+        if (rule.exclude?.some((x) => expandHome(x) === p)) continue;
+        // Age = newest change anywhere inside, not just the folder's own timestamp.
+        const { size, newest } = await sizer.measure(p);
+        mtime = Math.max(mtime, newest ?? 0);
         if (rule.olderThanDays && Date.now() - mtime < rule.olderThanDays * 86_400_000) continue;
-        const size = await sizer.sizeOf(p);
         if (!rule.group && size < min) continue;
         matches.push({ path: p, size, mtime });
       }

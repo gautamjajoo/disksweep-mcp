@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getPlatform } from "../platform/index.js";
-import { dataDir, isWithin, userHome } from "../paths.js";
+import { dataDir, fold, isWithin, isWithinFolded, onDiskSpelling, userHome } from "../paths.js";
 
 export type GuardResult = { ok: true } | { ok: false; reason: string };
 
@@ -68,60 +68,69 @@ const HOME_ALLOWED_EXCEPTIONS = ["Library/Containers/com.apple.mail/Data/Library
 /** Media libraries: may be suggested whole (review), never their insides. */
 const LIBRARY_PACKAGE_EXT = [".photoslibrary", ".photolibrary", ".musiclibrary", ".tvlibrary", ".imovielibrary", ".fcpbundle"];
 
+/** `rel` is folded (lower-case). */
 function isAppleOwnedLibraryPath(rel: string): boolean {
   const parts = rel.split(path.sep);
-  if (parts[0] !== "Library" || parts.length < 3) return false;
+  if (parts[0] !== "library" || parts.length < 3) return false;
   const area = parts[1];
   const owner = parts[2];
-  if (area === "Containers" || area === "Application Support" || area === "Caches" || area === "Logs") {
+  if (area === "containers" || area === "application support" || area === "caches" || area === "logs") {
     // Apple's own app data (com.apple.*). Caches/Logs included: some are not regenerated safely.
     return owner.startsWith("com.apple.");
   }
-  if (area === "Group Containers") {
+  if (area === "group containers") {
     return owner.startsWith("group.com.apple.") || /\.com\.apple\./.test(owner);
   }
   return false;
 }
 
 /**
- * Pure path check (no filesystem access beyond resolving parents).
- * `abs` must be absolute.
+ * Path check. Paths must be spelled exactly as on disk (APFS ignores case, so
+ * "~/library" would otherwise slip past a check for "~/Library"), and every
+ * comparison below is case- and normalisation-insensitive as a second layer.
  */
 export function checkPath(abs: string): GuardResult {
   if (typeof abs !== "string" || abs.length === 0) return deny("empty path");
   if (abs.includes("\0")) return deny("invalid path");
   if (!path.isAbsolute(abs)) return deny("path must be absolute");
-  const target = abs.length > 1 ? abs.replace(/\/+$/, "") : abs;
+  if (abs.length > 1 && abs.endsWith("/")) return deny("path must not end with '/' (it would follow a symlink)");
+  const target = abs;
   if (path.normalize(target) !== target) {
     return deny("path is not normalised (contains '..', '.', or duplicate slashes)");
   }
+  const spelled = onDiskSpelling(target);
+  if (spelled !== undefined && spelled !== target) {
+    return deny(`spelled differently on disk (${spelled}); only the exact on-disk path is accepted`);
+  }
   const home = userHome();
   const platform = getPlatform();
+  const t = fold(target);
+  const h = fold(home);
 
   if (target === "/") return deny("the root of the disk is never touched");
-  if (target.split(path.sep).includes(".git")) return deny("git repository internals are never touched");
+  if (t.split(path.sep).includes(".git")) return deny("git repository internals are never touched");
 
   for (const root of platform.systemRoots) {
-    if (isWithin(target, root)) return deny(`${root} is an operating-system location`);
+    if (isWithin(t, fold(root))) return deny(`${root} is an operating-system location`);
   }
 
   // Allowed zone 2: third-party apps directly in /Applications.
-  if (path.dirname(target) === "/Applications") {
-    if (!target.endsWith(".app")) return deny("only .app bundles in /Applications may be suggested");
+  if (path.dirname(t) === "/applications") {
+    if (!t.endsWith(".app")) return deny("only .app bundles in /Applications may be suggested");
     return OK; // Apple-signed apps are rejected by verifyOnDisk.
   }
 
   // Allowed zone 1: inside $HOME (never $HOME itself).
-  if (!isWithin(target, home) || target === home) {
+  if (!isWithin(t, h) || t === h) {
     return deny("outside the allowed zones (your home folder and third-party apps)");
   }
-  const rel = path.relative(home, target);
+  const rel = path.relative(h, t);
   const parts = rel.split(path.sep);
 
-  if (isWithin(target, dataDir())) return deny("disksweep's own data");
+  if (isWithinFolded(target, dataDir())) return deny("disksweep's own data");
 
   if (parts.length === 1) {
-    if (HOME_STANDARD_FOLDERS.includes(parts[0])) return deny(`~/${parts[0]} itself is never removed`);
+    if (HOME_STANDARD_FOLDERS.some((f) => fold(f) === parts[0])) return deny(`~/${path.basename(target)} itself is never removed`);
     let isDir = false;
     try {
       isDir = fs.lstatSync(target).isDirectory();
@@ -131,14 +140,12 @@ export function checkPath(abs: string): GuardResult {
     if (!isDir) return deny("files directly in your home folder (shell and app settings) are never touched");
   }
   // Direct children of ~/Library (Caches, Logs, Application Support…) are structural.
-  if (parts[0] === "Library" && parts.length === 2) return deny(`~/Library/${parts[1]} itself is never removed`);
+  if (parts[0] === "library" && parts.length === 2) return deny(`~/Library/${path.basename(target)} itself is never removed`);
 
-  const allowedException = HOME_ALLOWED_EXCEPTIONS.some(
-    (ex) => isWithin(rel, ex) && rel !== ex,
-  );
+  const allowedException = HOME_ALLOWED_EXCEPTIONS.some((ex) => isWithin(rel, fold(ex)) && rel !== fold(ex));
   if (!allowedException) {
     for (const tree of HOME_PROTECTED_TREES) {
-      if (isWithin(rel, tree)) return deny(`~/${tree} holds settings, credentials or synced data`);
+      if (isWithin(rel, fold(tree))) return deny(`~/${tree} holds settings, credentials or synced data`);
     }
     if (isAppleOwnedLibraryPath(rel)) return deny("macOS's own app data (com.apple.*)");
   }
@@ -166,14 +173,16 @@ export async function verifyOnDisk(abs: string): Promise<GuardResult> {
     return deny("no longer exists");
   }
 
-  // The parent chain must be real: blocks ~/innocent-link/../.. style tricks
-  // and links that make a protected location look like an allowed one.
+  // The parent chain must be real and spelled as on disk: blocks
+  // ~/innocent-link/... tricks and case-variant spellings of protected folders.
   try {
-    const realParent = await fs.promises.realpath(path.dirname(abs));
-    if (realParent !== path.dirname(abs)) return deny("a parent folder is a symlink; refusing to follow it");
+    const realParent = fs.realpathSync.native(path.dirname(abs));
+    if (realParent !== path.dirname(abs)) return deny("a parent folder is a symlink or spelled differently on disk");
   } catch {
     return deny("cannot resolve parent folder");
   }
+  if (onDiskSpelling(abs) !== abs) return deny("spelled differently on disk");
+  if (abs.length > 1 && abs.endsWith("/")) return deny("path must not end with '/'");
 
   try {
     const facts = await platform.fileFacts(abs);

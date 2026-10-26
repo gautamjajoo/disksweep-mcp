@@ -138,3 +138,44 @@ describe("assertSafe: on-disk verification", () => {
     }
   });
 });
+
+describe("red team: APFS is case-insensitive (review finding #1)", () => {
+  const variants = ["library", "LIBRARY", "desktop", "Library/keychains", "Library/KEYCHAINS/login.keychain-db", "LIBRARY/Preferences",
+    "Library/Containers/COM.APPLE.Safari", "Projects/site/.GIT", ".SSH", ".Ssh/id_ed25519", "Library/caches"];
+  for (const v of variants) {
+    it(`refuses ~/${v}`, async () => {
+      expect(checkPath(path.join(home, v)).ok).toBe(false);
+      expect((await assertSafe(path.join(home, v))).ok).toBe(false);
+    });
+  }
+  it("refuses a case-variant spelling even of something allowed (exact spelling only)", () => {
+    expect(checkPath(path.join(home, "library/caches/com.example.app")).ok).toBe(false);
+    expect(checkPath(path.join(home, "Library/Caches/COM.EXAMPLE.APP")).ok).toBe(false);
+    expect(checkPath(path.join(home, "Library/Caches/com.example.app")).ok).toBe(true);
+  });
+  it("refuses decomposed-Unicode spellings of protected names", () => {
+    // "é" written as e + combining accent must not dodge a comparison.
+    expect(checkPath(path.join(home, "Library/Keychains".normalize("NFD")))).toMatchObject({ ok: false });
+  });
+});
+
+describe("red team: trailing slash would follow a symlink (review finding #2)", () => {
+  it("refuses a symlink path with a trailing slash", async () => {
+    fs.mkdirSync(path.join(home, "Downloads"), { recursive: true });
+    fs.symlinkSync(path.join(home, ".ssh"), path.join(home, "Downloads/lnk"));
+    expect(checkPath(path.join(home, "Downloads/lnk") + "/").ok).toBe(false);
+    expect((await assertSafe(path.join(home, "Downloads/lnk") + "/")).ok).toBe(false);
+  });
+  it("expandHome strips trailing slashes", async () => {
+    const { expandHome } = await import("../src/paths.js");
+    expect(expandHome("~/Downloads/lnk/")).toBe(path.join(home, "Downloads/lnk"));
+  });
+});
+
+describe("user keep decisions ignore case too", () => {
+  it("a keep on ~/Documents/x also covers ~/documents/x", async () => {
+    const { remember, isExcluded } = await import("../src/memory.js");
+    remember(path.join(home, "Documents/x"), "keep", "keep");
+    expect(isExcluded(path.join(home, "documents/X/y"))).toBeTruthy();
+  });
+});

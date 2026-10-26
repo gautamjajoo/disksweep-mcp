@@ -7,7 +7,7 @@
  *               that grow back after cleaning.
  */
 import fs from "node:fs";
-import { dataPath, isWithin, readJson, writeJson } from "./paths.js";
+import { dataPath, isWithinFolded, readJson, writeJson } from "./paths.js";
 import { withLockSync } from "./lock.js";
 
 export type Decision = "keep" | "never-suggest";
@@ -69,7 +69,7 @@ function forgetLocked(path: string): boolean {
 export function noteFor(path: string, notes = loadNotes()): Note | undefined {
   let best: Note | undefined;
   for (const n of Object.values(notes)) {
-    if (isWithin(path, n.path) && (!best || n.path.length > best.path.length)) best = n;
+    if (isWithinFolded(path, n.path) && (!best || n.path.length > best.path.length)) best = n;
   }
   return best;
 }
@@ -77,7 +77,7 @@ export function noteFor(path: string, notes = loadNotes()): Note | undefined {
 /** True if the user asked never to suggest this path (or something containing it). */
 export function isExcluded(path: string, notes = loadNotes()): Note | undefined {
   return Object.values(notes).find(
-    (n) => (n.decision === "keep" || n.decision === "never-suggest") && (isWithin(path, n.path) || isWithin(n.path, path)),
+    (n) => (n.decision === "keep" || n.decision === "never-suggest") && (isWithinFolded(path, n.path) || isWithinFolded(n.path, path)),
   );
 }
 

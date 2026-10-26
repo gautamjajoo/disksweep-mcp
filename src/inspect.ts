@@ -6,13 +6,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, execFile } from "node:child_process";
-import readline from "node:readline";
 import { promisify } from "node:util";
 import { getPlatform } from "./platform/index.js";
 import { describeAge, formatBytes } from "./format.js";
 import { isWithin, tildify, userHome } from "./paths.js";
 import { assertSafe } from "./safety/guard.js";
-import { sizingEngine } from "./scan/du.js";
+import { records, sizingEngine } from "./scan/du.js";
 import { installedApps, ownerOf } from "./detect/apps.js";
 import { loadRules, expandPattern } from "./detect/rules.js";
 import { lastCleaned, noteFor } from "./memory.js";
@@ -64,7 +63,7 @@ function extOf(p: string): string {
 /** Walk with dsize -m (or du) and aggregate; stops at the time limit and reports partial stats. */
 async function walk(target: string, timeLimitMs: number) {
   const engine = sizingEngine();
-  const args = engine.name === "dsize" ? ["-m", "--", target] : ["-x", "-a", "-k", "--", target];
+  const args = [...engine.args, "--", target];
   const child = spawn(engine.cmd, args, { stdio: ["ignore", "pipe", "ignore"] });
   const timer = setTimeout(() => child.kill(), timeLimitMs);
   const now = Date.now();
@@ -81,8 +80,7 @@ async function walk(target: string, timeLimitMs: number) {
     dirs: new Set<string>(),
     names: new Set<string>(),
   };
-  const rl = readline.createInterface({ input: child.stdout! });
-  for await (const line of rl) {
+  for await (const line of records(child.stdout!, engine.sep)) {
     const parts = line.split("\t");
     let size: number, mtime: number | undefined, p: string;
     if (engine.name === "dsize") {

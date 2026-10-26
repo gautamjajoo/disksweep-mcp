@@ -20,11 +20,47 @@ export function dataPath(...parts: string[]): string {
   return p;
 }
 
-/** Expand a leading ~ and normalise. Does not touch the filesystem. */
+/** Expand a leading ~, normalise, and drop trailing slashes. Does not touch the filesystem. */
 export function expandHome(p: string): string {
-  if (p === "~") return userHome();
-  if (p.startsWith("~/")) return path.join(userHome(), p.slice(2));
-  return path.resolve(p);
+  let out: string;
+  if (p === "~") out = userHome();
+  else if (p.startsWith("~/")) out = path.join(userHome(), p.slice(2));
+  else out = path.resolve(p);
+  return out.length > 1 ? out.replace(/\/+$/, "") : out;
+}
+
+/**
+ * APFS is case-insensitive and normalisation-insensitive by default:
+ * "~/library" and "~/Library" are the same folder. Compare folded forms.
+ */
+export function fold(p: string): string {
+  return p.normalize("NFC").toLowerCase();
+}
+
+/** isWithin, ignoring case and Unicode normalisation (how APFS compares names). */
+export function isWithinFolded(child: string, parent: string): boolean {
+  return isWithin(fold(child), fold(parent));
+}
+
+/**
+ * The path exactly as the filesystem spells it (case, Unicode form), without
+ * following a symlink in the last component. undefined if it doesn't exist.
+ */
+export function onDiskSpelling(p: string): string | undefined {
+  try {
+    fs.lstatSync(p);
+  } catch {
+    return undefined;
+  }
+  if (p === "/") return p;
+  try {
+    const parent = fs.realpathSync.native(path.dirname(p));
+    const want = fold(path.basename(p));
+    const leaf = fs.readdirSync(parent).find((n) => fold(n) === want) ?? path.basename(p);
+    return path.join(parent, leaf);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Show paths under home as ~/… for readability. */

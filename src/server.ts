@@ -10,7 +10,7 @@ import { growthOver } from "./scan/snapshot.js";
 import { ALL_DETECTORS, analyse, formatAnalysis, DetectorName } from "./analyse.js";
 import { inspect, formatInspect } from "./inspect.js";
 import { createProposal, formatProposal, trashApproved } from "./proposal.js";
-import { emptyOldTrash, formatTrashList, listOldTrash } from "./trash.js";
+import { emptyShownTrash, formatTrashList, listOldTrash, rememberShownList } from "./trash.js";
 import { forget, loadHistory, loadNotes, remember } from "./memory.js";
 import { discoverUninstalled, formatLeftovers, leftoversFor } from "./detect/leftovers.js";
 
@@ -322,13 +322,17 @@ export function createServer(): McpServer {
     "list_old_trash",
     {
       title: "List old Trash items",
-      description: "What's in the Trash and has been there longer than N days, with sizes. Read-only; use before empty_old_trash.",
+      description:
+        "What's in the Trash and has been there longer than N days, with sizes. Returns a list token: empty_old_trash deletes exactly this list (valid 15 minutes, once). Read-only.",
       inputSchema: { older_than_days: z.number().int().min(0).default(7) },
       annotations: { readOnlyHint: true },
     },
     async ({ older_than_days }) => {
       const { items, error } = await listOldTrash(older_than_days);
-      return text(error ?? formatTrashList(items, older_than_days));
+      if (error) return text(error);
+      if (!items.length) return text(formatTrashList(items, older_than_days));
+      const token = rememberShownList(items);
+      return text(`${formatTrashList(items, older_than_days)}\n\nList token: ${token}. Show this list to the user; if they confirm, call empty_old_trash with this token.`);
     },
   );
 
@@ -337,12 +341,12 @@ export function createServer(): McpServer {
     {
       title: "Permanently delete old Trash items",
       description:
-        "PERMANENTLY deletes items that have been in the Trash longer than N days. Only call after showing list_old_trash to the user and getting explicit confirmation; requires confirm: true.",
-      inputSchema: { older_than_days: z.number().int().min(1).default(7), confirm: z.literal(true) },
+        "PERMANENTLY deletes exactly the Trash items from a list_old_trash result (by its token), after the user explicitly confirmed that list. Items replaced since are skipped.",
+      inputSchema: { list_token: z.string(), confirm: z.literal(true) },
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
-    async ({ older_than_days }) => {
-      const r = await emptyOldTrash(older_than_days);
+    async ({ list_token }) => {
+      const r = await emptyShownTrash(list_token);
       const d = await platform.diskInfo("/");
       return text(
         [`Permanently deleted ${r.removed.length} item(s), ${formatBytes(r.freed)}. Free space now: ${formatBytes(d.freeBytes)}.`, ...r.errors.map((e) => `  - ${e}`)].join("\n"),

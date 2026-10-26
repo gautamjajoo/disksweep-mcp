@@ -73,7 +73,7 @@ disksweep never schedules itself; you decide if and when it runs. Some options:
 | `remember` / `recall` | Save what something is, or "keep" / "never suggest" |
 | `create_proposal` | Freeze a numbered list for approval (detector findings or investigated paths with a reason) |
 | `trash_approved` | Move only the approved numbers to the Trash, re-checking everything first |
-| `list_old_trash` / `empty_old_trash` | See, then (with `confirm: true`) permanently empty, items trashed more than N days ago |
+| `list_old_trash` / `empty_old_trash` | List items trashed more than N days ago, then permanently delete exactly that list, once you confirm (token-bound, 15 minutes, single use) |
 | `cleanup_history` | What was cleaned and how much space it freed |
 
 **Detectors:** rule packs · stale project build folders (`node_modules`, `.venv`, `target`, `.next`… in projects untouched for 30+ days; only the regenerable folder, never your code) · large files · Downloads/Desktop items not used for 60+ days · apps not opened for 90+ days · leftovers of uninstalled apps · duplicates (clone-aware, so APFS copies that share blocks aren't counted as waste).
@@ -97,7 +97,8 @@ The guard (`src/safety/guard.ts`) is **default-deny**, and its rules are code, n
 - It acts only inside your home folder, plus third-party `.app` bundles in `/Applications`.
 - **Never touched:** `/System`, `/usr`, `/bin`, `/sbin`, `/private`, `/Library`, `/opt`, `/Volumes` and the rest of the OS. Inside your home: settings and credentials (`~/Library/Preferences`, `Keychains`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config`, shell dotfiles), synced data (iCloud Drive, `CloudStorage`), Mail, Messages, Safari, Apple's own app data (`com.apple.*`), `.git` internals, the insides of Photos and Music libraries, and the top-level folders themselves (`~/Documents`, `~/Library/Caches`…).
 - Before anything moves, it re-checks every path: no symlinked parents, the path wasn't replaced, it isn't SIP-protected, locked or owned by another user, it isn't a mount point, and it isn't an Apple app. Items the user must review are skipped if they changed after you saw them. Apps' data is skipped while the app is running.
-- It never uses `sudo`. Items always go to the Trash first. The only permanent deletion is emptying old Trash items, and that requires an explicit confirmation.
+- Paths must match their exact on-disk spelling. APFS ignores letter case, so `~/library` would otherwise slip past a check for `~/Library`. Comparisons also ignore case and Unicode normalisation as a second layer. Trailing slashes, which would make macOS follow a symlink, are refused.
+- It never uses `sudo`. Items always go to the Trash first. The only permanent deletion is emptying old Trash items, and only the exact list you were shown.
 - Red-team tests cover tampered proposal files, `..` and symlink tricks, SIP-protected files and locked files.
 
 Add your own never-touch paths in `~/.disksweep/config.json`:

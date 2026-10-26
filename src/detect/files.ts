@@ -35,7 +35,14 @@ export async function findLargeFiles(index: ScanIndex, claimed: string[], minByt
     if (f.size < minBytes) break;
     if (!isWithin(f.path, home)) continue;
     if (claimed.some((c) => isWithin(f.path, c))) continue;
-    if (!fs.existsSync(f.path)) continue;
+    // Trust the disk, not the index: the size must really be there.
+    let st: fs.Stats;
+    try {
+      st = await fs.promises.lstat(f.path);
+    } catch {
+      continue;
+    }
+    if (!st.isFile() || st.blocks * 512 < minBytes) continue;
     const used = await lastUse(f.path);
     // A file changed in the last week is in active use (a live database, a VM disk…).
     if (used && Date.now() - used < ACTIVE_DAYS * 86_400_000) continue;

@@ -1,6 +1,6 @@
 import { loadConfig } from "./config.js";
 import { formatBytes, describeAge } from "./format.js";
-import { isWithin, tildify, expandHome, dataPath, writeJson, readJson } from "./paths.js";
+import { isWithin, isWithinFolded, tildify, expandHome, dataPath, writeJson, readJson } from "./paths.js";
 import { checkPath } from "./safety/guard.js";
 import { ScanIndex } from "./scan/tree.js";
 import { growthOver, Growth } from "./scan/snapshot.js";
@@ -77,6 +77,7 @@ export async function analyse(index: ScanIndex | undefined, detectors: DetectorN
         size: total,
         reason: `${r.app} is no longer installed${r.inferred ? " (identified from its data, not the built-in app list)" : ""}.${vendorNote} Use app_leftovers "${r.app}" to see each item and why it matched.`,
         lastUsed: Math.max(...items.map((it) => it.newest ?? 0)) || undefined,
+        leftoverOf: r.app,
       });
       claimed.push(...paths);
     }
@@ -104,7 +105,7 @@ export async function analyse(index: ScanIndex | undefined, detectors: DetectorN
     const ok =
       c.paths.every((p) => checkPath(p).ok) &&
       !c.paths.some((p) => isExcluded(p, notes)) &&
-      !c.paths.some((p) => protectedByUser.some((x) => isWithin(p, x) || isWithin(x, p)));
+      !c.paths.some((p) => protectedByUser.some((x) => isWithinFolded(p, x) || isWithinFolded(x, p)));
     if (!ok) excluded++;
     return ok;
   });

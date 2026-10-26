@@ -14,6 +14,7 @@
  * Unreadable folders are reported on stderr as "dsize: <path>: <error>".
  *
  * Usage: dsize [-s] [-m] <path>...
+ *   -0  end each record with NUL instead of newline (file names may contain newlines)
  *   -m  also print modification time (unix seconds) as a middle column; for a
  *       folder it is the newest modification anywhere inside it
  *   -s  print only each root's total, measuring each root independently
@@ -68,11 +69,12 @@ static u64set hardlinks, clones;
 static dev_t root_dev;
 static int print_all = 1;
 static int show_mtime = 0;
+static char term = '\n';
 static char outbuf[1 << 16];
 
 static void emit(uint64_t bytes, long mtime, const char *path) {
-    if (show_mtime) printf("%llu\t%ld\t%s\n", (unsigned long long)bytes, mtime, path);
-    else printf("%llu\t%s\n", (unsigned long long)bytes, path);
+    if (show_mtime) printf("%llu\t%ld\t%s%c", (unsigned long long)bytes, mtime, path, term);
+    else printf("%llu\t%s%c", (unsigned long long)bytes, path, term);
 }
 
 static void report(const char *path, int err) {
@@ -117,7 +119,7 @@ static uint64_t scan_dir(char *path, size_t plen, int depth, long *latest) {
     al.fileattr = ATTR_FILE_LINKCOUNT | ATTR_FILE_ALLOCSIZE;
     al.forkattr = ATTR_CMNEXT_CLONEID | ATTR_CMNEXT_EXT_FLAGS;
 
-    const size_t bufsz = 256 * 1024;
+    const size_t bufsz = 64 * 1024; /* one per open directory level */
     char *mybuf = malloc(bufsz);
     if (!mybuf) { perror("dsize"); exit(2); }
 
@@ -202,10 +204,11 @@ int main(int argc, char **argv) {
     for (; first < argc && argv[first][0] == '-' && argv[first][1] && argv[first][1] != '-'; first++) {
         if (strcmp(argv[first], "-s") == 0) print_all = 0;
         else if (strcmp(argv[first], "-m") == 0) show_mtime = 1;
+        else if (strcmp(argv[first], "-0") == 0) term = '\0';
         else { fprintf(stderr, "dsize: unknown option %s\n", argv[first]); return 2; }
     }
     if (first < argc && strcmp(argv[first], "--") == 0) first++;
-    if (first >= argc) { fprintf(stderr, "usage: dsize [-s] [-m] <path>...\n"); return 2; }
+    if (first >= argc) { fprintf(stderr, "usage: dsize [-s] [-m] [-0] <path>...\n"); return 2; }
     int status = 0;
     for (int i = first; i < argc; i++) {
         struct stat st;
@@ -215,10 +218,12 @@ int main(int argc, char **argv) {
             free(hardlinks.slots); free(clones.slots);
             memset(&hardlinks, 0, sizeof hardlinks); memset(&clones, 0, sizeof clones);
         }
+        size_t arglen = strlen(argv[i]);
+        if (arglen >= PATH_MAX) { report(argv[i], ENAMETOOLONG); status = 1; continue; }
         char *path = malloc(PATH_MAX);
-        strncpy(path, argv[i], PATH_MAX - 1);
-        path[PATH_MAX - 1] = '\0';
-        size_t len = strlen(path);
+        if (!path) { perror("dsize"); return 2; }
+        memcpy(path, argv[i], arglen + 1);
+        size_t len = arglen;
         while (len > 1 && path[len - 1] == '/') path[--len] = '\0';
         if (S_ISDIR(st.st_mode)) {
             long latest = (long)st.st_mtimespec.tv_sec;

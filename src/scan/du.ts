@@ -16,11 +16,27 @@ import { fileURLToPath } from "node:url";
 
 const DSIZE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../native/bin/dsize");
 
-export function sizingEngine(): { name: "dsize" | "du"; cmd: string; args: string[]; unit: number; mtime: boolean } {
+export function sizingEngine(): { name: "dsize" | "du"; cmd: string; args: string[]; unit: number; mtime: boolean; sep: string } {
   if (process.env.DISKSWEEP_ENGINE !== "du" && fs.existsSync(DSIZE)) {
-    return { name: "dsize", cmd: DSIZE, args: ["-m"], unit: 1, mtime: true };
+    return { name: "dsize", cmd: DSIZE, args: ["-m", "-0"], unit: 1, mtime: true, sep: "\0" };
   }
-  return { name: "du", cmd: "/usr/bin/du", args: ["-x", "-a", "-k"], unit: 1024, mtime: false };
+  // Fallback: du can't NUL-separate, so a file name containing a newline could
+  // forge a record; consumers re-verify sizes on disk before trusting them.
+  return { name: "du", cmd: "/usr/bin/du", args: ["-x", "-a", "-k"], unit: 1024, mtime: false, sep: "\n" };
+}
+
+/** Split a stream into records on `sep` (NUL for dsize -0, newline for du). */
+export async function* records(stream: NodeJS.ReadableStream, sep: string): AsyncGenerator<string> {
+  let buf = "";
+  for await (const chunk of stream) {
+    buf += chunk.toString();
+    let i: number;
+    while ((i = buf.indexOf(sep)) >= 0) {
+      yield buf.slice(0, i);
+      buf = buf.slice(i + 1);
+    }
+  }
+  if (buf) yield buf;
 }
 import { SizeNode, TopFiles, sortChildren } from "./tree.js";
 
@@ -67,8 +83,7 @@ export function duTree(roots: string[], opts: DuOptions): Promise<DuResult> {
     const denied: string[] = [];
     let entries = 0;
 
-    const rl = readline.createInterface({ input: child.stdout });
-    rl.on("line", (line) => {
+    const onRecord = (line: string) => {
       const tab = line.indexOf("\t");
       if (tab < 1) return;
       const amount = Number(line.slice(0, tab));
@@ -115,7 +130,10 @@ export function duTree(roots: string[], opts: DuOptions): Promise<DuResult> {
         pending.set(parent, bucket);
       }
       if (size >= opts.minNodeBytes) bucket.children.push(node);
-    });
+    };
+    const reading = (async () => {
+      for await (const rec of records(child.stdout, engine.sep)) onRecord(rec);
+    })();
 
     const errRl = readline.createInterface({ input: child.stderr });
     errRl.on("line", (line) => {
@@ -125,7 +143,8 @@ export function duTree(roots: string[], opts: DuOptions): Promise<DuResult> {
     });
 
     child.on("error", reject);
-    child.on("close", (code) => {
+    child.on("close", async (code) => {
+      await reading.catch(() => {});
       // Exit 1 means some folders were unreadable; that's expected.
       if (code !== 0 && code !== 1 && !opts.signal?.aborted) {
         reject(new Error(`${engine.name} exited with code ${code}`));
